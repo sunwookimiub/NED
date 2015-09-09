@@ -10,7 +10,7 @@ import argparse
 import subprocess
 
 # --------------------------- Get the Boundaries -------------------------
-def generateBoundaries(inputDir, output, secondDir):
+def generateBoundaries(inputDir, output, secondDir=None):
     """
     Generate the boundaries.json file
 
@@ -24,7 +24,8 @@ def generateBoundaries(inputDir, output, secondDir):
     count = 0
     js_lists = []
     getBnds(inputDir, js_lists)
-    getBnds(secondDir, js_lists)
+    if secondDir:
+        getBnds(secondDir, js_lists)
     with open(output, 'wb') as json_file:
         json.dump(js_lists, json_file, indent=4)
 
@@ -59,9 +60,9 @@ def getBnds(dir, js_lists):
                     else:
                         kw = nameWOSuffix
                     keywords.append(kw)
-                    js_up = {"_id": id, "visible": "true", "name": name,\
-                              "description": desc, "projection": "EPSG:4269",\
-                              "shape": shape, "keywords": keywords}
+                    js_up = {"_id": id, "visible": True, "name": name,\
+                             "description": desc, "projection": "EPSG:4269",\
+                             "shape": shape, "keywords": keywords}
                     js_lists.append(js_up)
 
 def checkIfRelevant(set, nameWOSuffix):
@@ -75,18 +76,18 @@ def checkIfRelevant(set, nameWOSuffix):
     set:            - The name of the set [HUC or State]
     nameWOSuffix:   - Name of the file without suffix. [IL.geojson -> IL]  
     """
-        isRel = True
-        if set == "HUC2":
-            if re.search('[a-zA-Z]', nameWOSuffix) != None:
-                isRel = False
-            elif int(nameWOSuffix) > 18:
-                isRel = False
-        if set == "HUC4":
-            if re.search('[a-zA-Z]', nameWOSuffix) != None:
-                isRel = False
-            elif int(nameWOSuffix) > 1810:
-                isRel = False
-        return isRel
+    isRel = True
+    if set == "HUC2":
+        if re.search('[a-zA-Z]', nameWOSuffix) != None:
+            isRel = False
+        elif int(nameWOSuffix) > 18:
+            isRel = False
+    if set == "HUC4":
+        if re.search('[a-zA-Z]', nameWOSuffix) != None:
+            isRel = False
+        elif int(nameWOSuffix) > 1810:
+            isRel = False
+    return isRel
 
 
 # --------------------------- Get the Products --------------------------------
@@ -179,54 +180,56 @@ def createProd(dir, js_lists):
     js_lists:   - The array to append onto
     """
     source = "USGS_NED_DATA"
-    r = "-1"
+    r = -1
     # Set = HUC or State
     set = dir.split("/")[4]
     if "geojson" in set:
         set = dir.split("/")[3]
     for fn in os.listdir(dir):
         nameWOSuffix = fn.split(".")[0]
-        title = set + "_" + nameWOSuffix
-        boundary = title
-        if boundary != None:
-            js_up = {"visible": "true", "title": title, "public": \
-                    "true", \
-                    "input": {"source": source, "boundary": boundary, \
-                    "projection": "proj_4269", "resolution": [r,r], \
-                    "products": {"slope": "true", "hillshade": "true", \
-                    "pitremove": "false"}, "resamplingMethod": \
-                    "bilinear",
-                    "fileFormat": "GTiff"}}
-            js_lists.append(js_up)
+        boundary = set + "_" + nameWOSuffix
+        fullPath = os.path.join(dir, fn)
+        with fiona.open(fullPath) as src:
+            for layer in src:
+                title = layer['properties']['NAME']
+        js_up = {"visible": True, "title": title, "public": \
+                True, \
+                "input": {"source": source, "boundary": boundary, \
+                "projection": "proj_4269", "resolution": [r,r], \
+                "products": {"slope": True, "hillshade": True, \
+                "pitremove": False}, "resamplingMethod": \
+                "bilinear",
+                "fileFormat": "GTiff"}}
+        js_lists.append(js_up)
 
-            js_up = {"visible": "true", "title": title, "public": \
-                    "true", \
-                    "input": {"source": source, "boundary": boundary, \
-                    "projection": "proj_3857", "resolution": [r,r], \
-                    "products": {"slope": "true", "hillshade": "true", \
-                    "pitremove": "false"}, "resamplingMethod": \
-                    "bilinear",
-                    "fileFormat": "GTiff"}}
-            js_lists.append(js_up)
+        js_up = {"visible": True, "title": title, "public": \
+                True, \
+                "input": {"source": source, "boundary": boundary, \
+                "projection": "proj_3857", "resolution": [r,r], \
+                "products": {"slope": True, "hillshade": True, \
+                "pitremove": False}, "resamplingMethod": \
+                "bilinear",
+                "fileFormat": "GTiff"}}
+        js_lists.append(js_up)
 
-            js_up = {"visible": "true", "title": title, "public": \
-                    "true", \
-                    "input": {"source": source, "boundary": boundary, \
-                    "projection": "proj_5070", "resolution": [r,r], \
-                    "products": {"slope": "true", "hillshade": "true", \
-                    "pitremove": "true"}, "resamplingMethod": \
-                    "bilinear",
-                    "fileFormat": "GTiff"}}
-            js_lists.append(js_up)
+        js_up = {"visible": True, "title": title, "public": \
+                True, \
+                "input": {"source": source, "boundary": boundary, \
+                "projection": "proj_5070", "resolution": [r,r], \
+                "products": {"slope": True, "hillshade": True, \
+                "pitremove": True}, "resamplingMethod": \
+                "bilinear",
+                "fileFormat": "GTiff"}}
+        js_lists.append(js_up)
 
         if "State" in set and len(nameWOSuffix)<3:
             comp = "proj_"+states[nameWOSuffix]
-            js_up = {"visible": "true", "title": title, "public": \
-                    "true", \
+            js_up = {"visible": True, "title": title, "public": \
+                    True, \
                     "input": {"source": source, "boundary": boundary, \
                     "projection": comp, "resolution": [r,r], \
-                    "products": {"slope": "true", "hillshade": "true", \
-                    "pitremove": "false"}, "resamplingMethod": \
+                    "products": {"slope": True, "hillshade": True, \
+                    "pitremove": False}, "resamplingMethod": \
                     "bilinear",
                     "fileFormat": "GTiff"}}
             js_lists.append(js_up)
@@ -248,7 +251,7 @@ def generateSources(inputDir, output, secondInputDir=None):
     _id = "USGS_NED_DATA"
     detail = "Details of the data source that can be recognized by the Data Service"
     keywords = ["USGS NED"]
-    js_up = {"_id": _id, "visible": "true", "name": name, "detail": detail, "keywords": keywords}
+    js_up = {"_id": _id, "visible": True, "name": name, "detail": detail, "keywords": keywords}
     with open(output, 'wb') as json_file:
         json.dump(js_up, json_file, indent=4)
 
@@ -266,36 +269,34 @@ def generateProjections(inputDir, output, secondInputDir=None):
     secondInputDir: - Name of a second input directory
     """
     epsg = ["4269", "3857", "5070"]
-    retProj = []
     dictState = {}
     dictState[epsg[0]] = epsg[0]
     dictState[epsg[1]] = epsg[1]
     dictState[epsg[2]] = epsg[2]
 
     # Get Projection for all States
-    if secondInputDir:
-        stateList = []
-        for fn in os.listdir(secondInputDir):
-            fullPath = os.path.join(secondInputDir, fn)
-            nameWOSuffix = fn.split(".")[0]
-            with fiona.open(fullPath) as src:
-                for layer in src:
-                    stateList.append(layer['properties']['NAME'])
+    stateList = []
+    for fn in os.listdir(secondInputDir):
+        fullPath = os.path.join(secondInputDir, fn)
+        nameWOSuffix = fn.split(".")[0]
+        with fiona.open(fullPath) as src:
+            for layer in src:
+                stateList.append(layer['properties']['NAME'])
 
-        # Get EPSG for all States 
-        with open("stateEpsg.csv", 'r') as csvfile:
-            stEpReader = csv.reader(csvfile) 
-            for row in stEpReader:
-                for state in stateList:
-                    if state in row[2]:
-                        epsg.append(row[3])
-                        dictState[row[3]] = state
-                        break
+    # Get EPSG for all States 
+    with open("stateEpsg.csv", 'r') as csvfile:
+        stEpReader = csv.reader(csvfile) 
+        for row in stEpReader:
+            for state in stateList:
+                if state in row[2]:
+                    epsg.append(row[3])
+                    dictState[row[3]] = state
+                    break
 
+    retProj = []
     for p in epsg:
         retProj.append(returnProjJson(dictState[p], p))
 
-    # Write out into json file
     with open(output, 'wb') as json_file:
         json.dump(retProj, json_file, indent=4)
 
@@ -319,11 +320,11 @@ def returnProjJson(fn, epsg):
     fn:         - The name of the file without the .geojson suffix
     epsg:       - The epsg number [4269]
     """
-    id = "proj_" + fn
+    id = "proj_" + fn + "_" + epsg
     content = getProjContent("epsg:" + epsg)
     name = content.split(',')[0].split('[')[1].strip('\"')
     keywords = [x.strip() for x in name.split('/')]
-    js_up = {"_id": id, "visible": "true", "name": name, "epsg": epsg, \
+    js_up = {"_id": id, "visible": True, "name": name, "epsg": epsg, \
              "content": content, "keywords": keywords}
     return js_up
 
@@ -348,12 +349,13 @@ def main():
             help = "Name of the sources output json file")
     args = parser.parse_args()
 
-#    generateBoundaries(args.inputDir, args.boundaryOutput, \
-#                               args.secondInputDir)
-#    generateProjections(args.inputDir, args.projectionOutput, \
-#                        args.secondInputDir)
+    # test boundaries
+    generateBoundaries(args.inputDir, args.boundaryOutput, \
+                       args.secondInputDir)
+    generateProjections(args.inputDir, args.projectionOutput, \
+                        args.secondInputDir)
 #    generateProducts(args.inputDir, args.productOutput, args.secondInputDir)
-#    generateSources(args.inputDir, args.sourcesOutput, args.secondInputDir)
+    generateSources(args.inputDir, args.sourcesOutput, args.secondInputDir)
 
 
 if __name__ == "__main__":
